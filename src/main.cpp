@@ -55,10 +55,14 @@ unsigned long PreviousTime;
 
 int sensorState = 0;
 
+// tiempo inactividad de 10 minutos en milisegundos
+#define InactivityTimeMin 10
+#define InactivityTime (InactivityTimeMin * 60 * 1000)
+
 void setup()
 {
   // put your setup code here, to run once:
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(ShakeSensorAn, INPUT);
   pinMode(ShakeSensorDig, INPUT);
@@ -74,20 +78,18 @@ void setup()
 
   // WiFi
   // WiFi.mode(WIFI_STA); // Optional
-  WiFi.begin(ssid, password);
+
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  WiFi.begin(ssid, password);
   Serial.println("\nConnecting");
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
-    digitalWrite(LED, HIGH);
-    delay(500);
-    Serial.println("Connecting to WiFi..");
-    // show in display oled
     digitalWrite(LED, LOW);
-    display.setCursor(0, 20);
-    display.println("Connecting to WiFi..");
-    display.display();
+    Serial.println("Connecting to WiFi..");
+    delay(1000);
+    digitalWrite(LED, HIGH);
+    // show in display oled;
   }
 
   Serial.println("Connected to the Wi-Fi network");
@@ -128,6 +130,7 @@ void setup()
 }
 
 int counter = 0;
+bool lastShakeState = false;
 
 void loop()
 {
@@ -144,6 +147,7 @@ void loop()
     Serial.println("==============");
     Serial.println("");
     sensorState = 1;
+    lastShakeState = true;
     client.publish(topic, "Shake Detected");
     counter++;
     Serial.println("Counter: " + String(counter));
@@ -156,15 +160,24 @@ void loop()
     Serial.println("");
     sensorState = 0;
   }
-  delay(50);
   // create if no shake detected in 10 minutes send message to finish using millis
   // if shake detected reset millis
   // if millis > 10 minutes send message to finish using millis
+  // print current millis
+  // Serial.println("Current millis: " + String(millis()));
+  // print millis in seconds
+  Serial.println("Current millis in seconds: " + String(millis() / 1000));
+  // print previous millis in seconds
+  Serial.println("Previous millis in seconds: " + String(PreviousTime / 1000));
 
-  if (sensorState == 1)
+  // mostrar el tiempo hasta el evento sin moverse
+
+  Serial.println("Tiempo hasta el evento sin moverse: " + String((InactivityTime / 1000 + PreviousTime / 1000)));
+
+  if (lastShakeState == true && sensorState == 0)
   {
     CurrentTime = millis();
-    if (CurrentTime - PreviousTime > 600000)
+    if (CurrentTime - PreviousTime > InactivityTime)
     {
       Serial.println("10 minutes without shake");
       Serial.println("Sending message to finish");
@@ -176,6 +189,7 @@ void loop()
   {
     PreviousTime = millis();
   }
+  delay(100);
 }
 
 void reconnect()
